@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Presas Expostas — Ficha do Player</title>
+
+<!-- Firebase COMPAT (NÃO MUDE ISSO) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<style>
+body {
+  background:#0b0b0b;
+  color:#eaeaea;
+  font-family: monospace;
+  padding:20px;
+}
+input, textarea, button {
+  width:100%;
+  margin:5px 0;
+  padding:8px;
+  background:#111;
+  color:#fff;
+  border:1px solid #400;
+}
+button {
+  cursor:pointer;
+}
+.hidden { display:none; }
+h2 { color:#b00; }
+</style>
+</head>
+<body>
+
+<h1>🩸 Presas Expostas</h1>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <h2>Login</h2>
+  <input id="email" placeholder="Email">
+  <input id="senha" type="password" placeholder="Senha">
+  <button onclick="login()">Entrar</button>
+  <button onclick="registrar()">Criar Conta</button>
+  <p id="loginErro"></p>
+</div>
+
+<!-- FICHA -->
+<div id="fichaBox" class="hidden">
+  <h2>Ficha do Personagem</h2>
+
+  <input id="nome" placeholder="Nome do personagem">
+
+  <textarea id="historia" placeholder="História do personagem"></textarea>
+
+  <label>Foto do personagem</label>
+  <input type="file" id="foto">
+
+  <h3>🎯 Shots</h3>
+  <p id="shots">0 / 3</p>
+  <button onclick="addShot()">Adicionar Shot</button>
+
+  <h3>🧠 Tensão</h3>
+  <p id="tensao">0 / 10</p>
+
+  <h3>🎲 Dados</h3>
+  <input id="qtdDados" type="number" min="1" value="1">
+  <button onclick="rolarDados()">Rolar D6</button>
+  <p id="resultadoDados"></p>
+
+  <button onclick="salvarFicha()">Salvar Ficha</button>
+  <button onclick="logout()">Sair</button>
+</div>
+
+<script>
+/* 🔥 COLE AQUI O SEU firebaseConfig */
+const firebaseConfig = {
+  apiKey: "AIzaSyALP0nO2FneTe-qwKwC_mNlD5jzHMaPljo",
+  authDomain: "rpg-campanha.firebaseapp.com",
+  projectId: "rpg-campanha",
+  storageBucket: "rpg-campanha.firebasestorage.app",
+  messagingSenderId: "1095737273808",
+  appId: "1:1095737273808:web:9ab46ac71ba836825c1dd5"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+let userUID = null;
+let shots = 0;
+let tensao = 0;
+
+/* 🔐 AUTH */
+auth.onAuthStateChanged(user => {
+  if (user) {
+    userUID = user.uid;
+    loginBox.classList.add("hidden");
+    fichaBox.classList.remove("hidden");
+    carregarFicha();
+  } else {
+    loginBox.classList.remove("hidden");
+    fichaBox.classList.add("hidden");
+  }
+});
+
+function login() {
+  auth.signInWithEmailAndPassword(email.value, senha.value)
+    .catch(e => loginErro.innerText = e.message);
+}
+
+function registrar() {
+  auth.createUserWithEmailAndPassword(email.value, senha.value)
+    .catch(e => loginErro.innerText = e.message);
+}
+
+function logout() {
+  auth.signOut();
+}
+
+/* 📄 FICHA */
+function salvarFicha() {
+  db.collection("players").doc(userUID).set({
+    nome: nome.value,
+    historia: historia.value,
+    shots,
+    tensao
+  });
+  alert("Ficha salva");
+}
+
+function carregarFicha() {
+  db.collection("players").doc(userUID).get().then(doc => {
+    if (doc.exists) {
+      const d = doc.data();
+      nome.value = d.nome || "";
+      historia.value = d.historia || "";
+      shots = d.shots || 0;
+      tensao = d.tensao || 0;
+      atualizarUI();
+    }
+  });
+}
+
+/* 🎯 SHOTS */
+function addShot() {
+  shots++;
+  if (shots >= 3) shots = 0;
+  atualizarUI();
+}
+
+/* 🎲 DADOS */
+function rolarDados() {
+  let qtd = parseInt(qtdDados.value);
+  let res = [];
+  let falhas = 0;
+
+  for (let i = 0; i < qtd; i++) {
+    let d = Math.floor(Math.random() * 6) + 1;
+    res.push(d);
+    if (d <= 2) falhas++;
+  }
+
+  tensao += falhas;
+  if (tensao > 10) tensao = 10;
+
+  resultadoDados.innerText = "Resultados: " + res.join(", ");
+  atualizarUI();
+}
+
+function atualizarUI() {
+  shots.innerText = shots + " / 3";
+  tensao.innerText = tensao + " / 10";
+}
+</script>
+
+</body>
+</html>
