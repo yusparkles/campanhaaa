@@ -74,7 +74,7 @@ h2 { color:#b00; }
 </div>
 
 <script>
-/* 🔥 COLE AQUI O SEU firebaseConfig */
+/* 🔥 Firebase config (SEU, JÁ ESTÁ CORRETO) */
 const firebaseConfig = {
   apiKey: "AIzaSyALP0nO2FneTe-qwKwC_mNlD5jzHMaPljo",
   authDomain: "rpg-campanha.firebaseapp.com",
@@ -88,7 +88,15 @@ firebase.initializeApp(firebaseConfig);
 
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
+
+/* 🔗 CAMPANHA VIA URL */
+const params = new URLSearchParams(window.location.search);
+const campaignId = params.get("id");
+
+if (!campaignId) {
+  alert("Campanha não encontrada. Use o link correto.");
+  throw new Error("Sem ID de campanha");
+}
 
 let userUID = null;
 let shots = 0;
@@ -121,28 +129,40 @@ function logout() {
   auth.signOut();
 }
 
-/* 📄 FICHA */
+/* 📄 SALVAR FICHA NA CAMPANHA */
 function salvarFicha() {
-  db.collection("players").doc(userUID).set({
-    nome: nome.value,
-    historia: historia.value,
-    shots,
-    tensao
-  });
-  alert("Ficha salva");
+  db.collection("campaigns")
+    .doc(campaignId)
+    .collection("players")
+    .doc(userUID)
+    .set({
+      nome: nome.value,
+      historia: historia.value,
+      shots,
+      tensao,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+  alert("Ficha salva na campanha!");
 }
 
+/* 📥 CARREGAR FICHA DA CAMPANHA */
 function carregarFicha() {
-  db.collection("players").doc(userUID).get().then(doc => {
-    if (doc.exists) {
-      const d = doc.data();
-      nome.value = d.nome || "";
-      historia.value = d.historia || "";
-      shots = d.shots || 0;
-      tensao = d.tensao || 0;
-      atualizarUI();
-    }
-  });
+  db.collection("campaigns")
+    .doc(campaignId)
+    .collection("players")
+    .doc(userUID)
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        const d = doc.data();
+        nome.value = d.nome || "";
+        historia.value = d.historia || "";
+        shots = d.shots || 0;
+        tensao = d.tensao || 0;
+        atualizarUI();
+      }
+    });
 }
 
 /* 🎯 SHOTS */
@@ -155,8 +175,8 @@ function addShot() {
 /* 🎲 DADOS */
 function rolarDados() {
   let qtd = parseInt(qtdDados.value);
-  let res = [];
   let falhas = 0;
+  let res = [];
 
   for (let i = 0; i < qtd; i++) {
     let d = Math.floor(Math.random() * 6) + 1;
