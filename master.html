@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Presas Expostas — Escudo do Mestre</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+/* 📼 VHS / CRIS STYLE */
+body {
+  background:#050505;
+  color:#eaeaea;
+  font-family: monospace;
+  padding:20px;
+  overflow-x:hidden;
+}
+
+.scanlines::before {
+  content:"";
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.02),
+    rgba(255,255,255,0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+  z-index:999;
+}
+
+.flicker {
+  animation:flicker 0.15s infinite;
+}
+
+@keyframes flicker {
+  0% { opacity:1; }
+  50% { opacity:0.97; }
+  100% { opacity:1; }
+}
+
+h1,h2 {
+  color:#b00;
+  text-shadow:1px 1px 4px #400;
+}
+
+input, button {
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+  background:#111;
+  color:#fff;
+  border:1px solid #500;
+}
+
+button { cursor:pointer; }
+
+.panel {
+  border:1px solid #500;
+  padding:10px;
+  margin-bottom:15px;
+  background:#0b0b0b;
+}
+
+.player {
+  border:1px dashed #400;
+  padding:8px;
+  margin:5px 0;
+}
+
+.hidden { display:none; }
+</style>
+</head>
+
+<body class="scanlines flicker">
+
+<h1>🛡️ Presas Expostas</h1>
+<h2>Escudo do Mestre</h2>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <input id="email" placeholder="Email do Mestre">
+  <input id="senha" type="password" placeholder="Senha">
+  <button onclick="login()">Entrar</button>
+  <p id="erro"></p>
+</div>
+
+<!-- PAINEL -->
+<div id="painel" class="hidden">
+
+  <div class="panel">
+    <h2>🔪 Contador Global do Assassino</h2>
+    <p id="assassino">0</p>
+    <button onclick="alterarAssassino(1)">+</button>
+    <button onclick="alterarAssassino(-1)">-</button>
+  </div>
+
+  <div class="panel">
+    <h2>🎭 Players na Campanha</h2>
+    <div id="listaPlayers"></div>
+  </div>
+
+  <button onclick="logout()">Sair</button>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALP0nO2FneTe-qwKwC_mNlD5jzHMaPljo",
+  authDomain: "rpg-campanha.firebaseapp.com",
+  projectId: "rpg-campanha",
+  appId: "1:1095737273808:web:9ab46ac71ba836825c1dd5"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const params = new URLSearchParams(window.location.search);
+const campaignId = params.get("id");
+
+let assassino = 0;
+
+/* 🔐 LOGIN */
+function login() {
+  auth.signInWithEmailAndPassword(email.value, senha.value)
+    .catch(e => erro.innerText = e.message);
+}
+
+function logout() {
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    loginBox.classList.add("hidden");
+    painel.classList.remove("hidden");
+    carregarCampanha();
+  }
+});
+
+/* 🔪 ASSASSINO */
+function alterarAssassino(v) {
+  assassino = Math.max(0, assassino + v);
+  atualizarAssassino();
+  salvarAssassino();
+}
+
+function salvarAssassino() {
+  db.collection("campaigns")
+    .doc(campaignId)
+    .set({ assassino }, { merge:true });
+}
+
+function atualizarAssassino() {
+  document.getElementById("assassino").innerText = assassino;
+}
+
+/* 🎭 PLAYERS */
+function carregarCampanha() {
+  db.collection("campaigns").doc(campaignId).onSnapshot(doc => {
+    if (doc.exists && doc.data().assassino !== undefined) {
+      assassino = doc.data().assassino;
+      atualizarAssassino();
+    }
+  });
+
+  db.collection("campaigns")
+    .doc(campaignId)
+    .collection("players")
+    .onSnapshot(snapshot => {
+      listaPlayers.innerHTML = "";
+      snapshot.forEach(doc => {
+        const p = doc.data();
+        const id = doc.id;
+
+        listaPlayers.innerHTML += `
+          <div class="player">
+            <strong>${p.nome || "Sem nome"}</strong><br>
+
+            🎯 Shots:
+            <input type="number" value="${p.shots}" 
+              onchange="editarPlayer('${id}','shots',this.value)"><br>
+
+            🧠 Tensão:
+            <input type="number" value="${p.tensao}" 
+              onchange="editarPlayer('${id}','tensao',this.value)"><br>
+
+            🎲 Dados:
+            <input type="number" value="${p.dadosTotais}" 
+              onchange="editarPlayer('${id}','dadosTotais',this.value)"><br>
+
+            📜 História:
+            <textarea onchange="editarPlayer('${id}','historia',this.value)">
+${p.historia || ""}</textarea>
+          </div>
+        `;
+      });
+    });
+}
+
+function editarPlayer(playerId, campo, valor) {
+  db.collection("campaigns")
+    .doc(campaignId)
+    .collection("players")
+    .doc(playerId)
+    .update({
+      [campo]: Number.isNaN(Number(valor)) ? valor : Number(valor)
+    });
+}
+</script>
+
+</body>
+</html>
