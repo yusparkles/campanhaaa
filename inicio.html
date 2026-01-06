@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>C.R.I.S — Presas Expostas</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body {
+  background:#050505;
+  color:#eaeaea;
+  font-family: monospace;
+  padding:20px;
+}
+
+.scanlines::before {
+  content:"";
+  position:fixed;
+  inset:0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.03),
+    rgba(255,255,255,0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events:none;
+}
+
+h1 { color:#b00; }
+
+.panel {
+  border:1px solid #500;
+  padding:10px;
+  margin:10px 0;
+  background:#0b0b0b;
+}
+
+input, button {
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+  background:#111;
+  color:#fff;
+  border:1px solid #500;
+}
+
+button { cursor:pointer; }
+.campanha { border:1px dashed #400; padding:8px; margin:5px 0; }
+</style>
+</head>
+
+<body class="scanlines">
+
+<h1>📼 C.R.I.S</h1>
+<p>Sistema de Campanhas — Presas Expostas</p>
+
+<div class="panel" id="loginBox">
+  <input id="email" placeholder="Email">
+  <input id="senha" type="password" placeholder="Senha">
+  <button onclick="login()">Entrar</button>
+  <button onclick="registrar()">Criar Conta</button>
+  <p id="erro"></p>
+</div>
+
+<div class="panel hidden" id="campanhasBox">
+  <h2>📁 Campanhas</h2>
+
+  <input id="novaCampanha" placeholder="Nome da campanha">
+  <button onclick="criarCampanha()">Criar Campanha</button>
+
+  <div id="listaCampanhas"></div>
+
+  <button onclick="logout()">Sair</button>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALP0nO2FneTe-qwKwC_mNlD5jzHMaPljo",
+  authDomain: "rpg-campanha.firebaseapp.com",
+  projectId: "rpg-campanha",
+  appId: "1:1095737273808:web:9ab46ac71ba836825c1dd5"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    loginBox.classList.add("hidden");
+    campanhasBox.classList.remove("hidden");
+    carregarCampanhas();
+  }
+});
+
+function login() {
+  auth.signInWithEmailAndPassword(email.value, senha.value)
+    .catch(e => erro.innerText = e.message);
+}
+
+function registrar() {
+  auth.createUserWithEmailAndPassword(email.value, senha.value)
+    .catch(e => erro.innerText = e.message);
+}
+
+function logout() {
+  auth.signOut();
+}
+
+function criarCampanha() {
+  const nome = novaCampanha.value;
+  if (!nome) return;
+
+  db.collection("campaigns").add({
+    nome,
+    criadoEm: Date.now()
+  });
+
+  novaCampanha.value = "";
+}
+
+function carregarCampanhas() {
+  db.collection("campaigns").onSnapshot(snapshot => {
+    listaCampanhas.innerHTML = "";
+    snapshot.forEach(doc => {
+      const c = doc.data();
+      listaCampanhas.innerHTML += `
+        <div class="campanha">
+          <strong>${c.nome}</strong><br>
+          <button onclick="entrar('${doc.id}','player')">Entrar como Player</button>
+          <button onclick="entrar('${doc.id}','master')">Entrar como Mestre</button>
+        </div>
+      `;
+    });
+  });
+}
+
+function entrar(id, tipo) {
+  window.location.href = `${tipo}.html?id=${id}`;
+}
+</script>
+
+</body>
+</html>
