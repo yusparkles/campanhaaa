@@ -15,12 +15,11 @@ body {
   font-family: monospace;
   padding:20px;
 }
-
-.scanlines::before {
+.scanlines::before{
   content:"";
   position:fixed;
   inset:0;
-  background: repeating-linear-gradient(
+  background:repeating-linear-gradient(
     to bottom,
     rgba(255,255,255,0.03),
     rgba(255,255,255,0.03) 1px,
@@ -29,27 +28,28 @@ body {
   );
   pointer-events:none;
 }
-
-h1 { color:#b00; }
-
 .panel {
   border:1px solid #500;
   padding:10px;
   margin:10px 0;
   background:#0b0b0b;
 }
-
-input, button {
+input,button{
   width:100%;
-  padding:8px;
   margin:5px 0;
+  padding:8px;
   background:#111;
   color:#fff;
   border:1px solid #500;
 }
-
-button { cursor:pointer; }
-.campanha { border:1px dashed #400; padding:8px; margin:5px 0; }
+button{cursor:pointer}
+.campanha{
+  border:1px dashed #400;
+  padding:8px;
+  margin:5px 0;
+}
+.hidden{display:none}
+h1{color:#b00}
 </style>
 </head>
 
@@ -68,12 +68,9 @@ button { cursor:pointer; }
 
 <div class="panel hidden" id="campanhasBox">
   <h2>📁 Campanhas</h2>
-
   <input id="novaCampanha" placeholder="Nome da campanha">
   <button onclick="criarCampanha()">Criar Campanha</button>
-
   <div id="listaCampanhas"></div>
-
   <button onclick="logout()">Sair</button>
 </div>
 
@@ -85,62 +82,60 @@ const firebaseConfig = {
   appId: "1:1095737273808:web:9ab46ac71ba836825c1dd5"
 };
 
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-auth.onAuthStateChanged(user => {
-  if (user) {
+auth.onAuthStateChanged(user=>{
+  if(user){
     loginBox.classList.add("hidden");
     campanhasBox.classList.remove("hidden");
     carregarCampanhas();
   }
 });
 
-function login() {
-  auth.signInWithEmailAndPassword(email.value, senha.value)
-    .catch(e => erro.innerText = e.message);
+function login(){
+  auth.signInWithEmailAndPassword(email.value,senha.value)
+    .catch(e=>erro.innerText=e.message);
 }
-
-function registrar() {
-  auth.createUserWithEmailAndPassword(email.value, senha.value)
-    .catch(e => erro.innerText = e.message);
+function registrar(){
+  auth.createUserWithEmailAndPassword(email.value,senha.value)
+    .catch(e=>erro.innerText=e.message);
 }
+function logout(){auth.signOut()}
 
-function logout() {
-  auth.signOut();
-}
-
-function criarCampanha() {
-  const nome = novaCampanha.value;
-  if (!nome) return;
-
+function criarCampanha(){
+  if(!novaCampanha.value) return;
   db.collection("campaigns").add({
-    nome,
-    criadoEm: Date.now()
+    nome:novaCampanha.value,
+    criadoEm:Date.now()
+  }).then(doc=>{
+    alert("Campanha criada!\nID: "+doc.id);
   });
-
-  novaCampanha.value = "";
+  novaCampanha.value="";
 }
 
-function carregarCampanhas() {
-  db.collection("campaigns").onSnapshot(snapshot => {
-    listaCampanhas.innerHTML = "";
-    snapshot.forEach(doc => {
-      const c = doc.data();
-      listaCampanhas.innerHTML += `
+function carregarCampanhas(){
+  db.collection("campaigns").onSnapshot(snap=>{
+    listaCampanhas.innerHTML="";
+    snap.forEach(doc=>{
+      const c=doc.data();
+      listaCampanhas.innerHTML+=`
         <div class="campanha">
           <strong>${c.nome}</strong><br>
           <small>ID: ${doc.id}</small><br>
-          <button onclick="entrar('${doc.id}','player')">Entrar como Player</button>
-          <button onclick="entrar('${doc.id}','master')">Entrar como Mestre</button>
-        </div>
-      `;
+          <button onclick="entrar('${doc.id}','player')">Player</button>
+          <button onclick="entrar('${doc.id}','master')">Mestre</button>
+        </div>`;
     });
   });
 }
-  
+function entrar(id,tipo){
+  window.location.href=`${tipo}.html?id=${id}`;
+}
 </script>
 
 </body>
 </html>
+
