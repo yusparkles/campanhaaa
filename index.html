@@ -4,11 +4,10 @@
 <meta charset="UTF-8">
 <title>Presas Expostas — Ficha do Player</title>
 
-<!-- Firebase COMPAT (NÃO MUDE ISSO) -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <style>
 body {
@@ -17,6 +16,7 @@ body {
   font-family: monospace;
   padding:20px;
 }
+
 input, textarea, button {
   width:100%;
   margin:5px 0;
@@ -25,11 +25,45 @@ input, textarea, button {
   color:#fff;
   border:1px solid #400;
 }
-button {
-  cursor:pointer;
-}
+
+button { cursor:pointer; }
 .hidden { display:none; }
 h2 { color:#b00; }
+
+/* 🎲 DADO 3D */
+.scene {
+  width:80px;
+  height:80px;
+  perspective:600px;
+  margin:10px auto;
+}
+
+.cube {
+  width:100%;
+  height:100%;
+  position:relative;
+  transform-style:preserve-3d;
+  transition:transform 1s;
+}
+
+.face {
+  position:absolute;
+  width:80px;
+  height:80px;
+  background:#111;
+  border:2px solid #800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:32px;
+}
+
+.face1 { transform: rotateY(0deg) translateZ(40px); }
+.face2 { transform: rotateY(90deg) translateZ(40px); }
+.face3 { transform: rotateY(180deg) translateZ(40px); }
+.face4 { transform: rotateY(-90deg) translateZ(40px); }
+.face5 { transform: rotateX(90deg) translateZ(40px); }
+.face6 { transform: rotateX(-90deg) translateZ(40px); }
 </style>
 </head>
 <body>
@@ -51,11 +85,11 @@ h2 { color:#b00; }
   <h2>Ficha do Personagem</h2>
 
   <input id="nome" placeholder="Nome do personagem">
-
   <textarea id="historia" placeholder="História do personagem"></textarea>
 
-  <label>Foto do personagem</label>
-  <input type="file" id="foto">
+  <h3>🎲 Pool de Dados</h3>
+  <p>Dados Totais: <span id="dadosTotais">6</span></p>
+  <button onclick="ganharDado()">Ganhar +1 Dado</button>
 
   <h3>🎯 Shots</h3>
   <p id="shots">0 / 3</p>
@@ -64,9 +98,21 @@ h2 { color:#b00; }
   <h3>🧠 Tensão</h3>
   <p id="tensao">0 / 10</p>
 
-  <h3>🎲 Dados</h3>
+  <h3>🎲 Teste</h3>
   <input id="qtdDados" type="number" min="1" value="1">
-  <button onclick="rolarDados()">Rolar D6</button>
+  <button onclick="rolarTeste()">Rolar Dados</button>
+
+  <div class="scene">
+    <div class="cube" id="cube">
+      <div class="face face1">1</div>
+      <div class="face face2">2</div>
+      <div class="face face3">3</div>
+      <div class="face face4">4</div>
+      <div class="face face5">5</div>
+      <div class="face face6">6</div>
+    </div>
+  </div>
+
   <p id="resultadoDados"></p>
 
   <button onclick="salvarFicha()">Salvar Ficha</button>
@@ -74,13 +120,10 @@ h2 { color:#b00; }
 </div>
 
 <script>
-/* 🔥 Firebase config (SEU, JÁ ESTÁ CORRETO) */
 const firebaseConfig = {
   apiKey: "AIzaSyALP0nO2FneTe-qwKwC_mNlD5jzHMaPljo",
   authDomain: "rpg-campanha.firebaseapp.com",
   projectId: "rpg-campanha",
-  storageBucket: "rpg-campanha.firebasestorage.app",
-  messagingSenderId: "1095737273808",
   appId: "1:1095737273808:web:9ab46ac71ba836825c1dd5"
 };
 
@@ -89,32 +132,26 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* 🔗 CAMPANHA VIA URL */
 const params = new URLSearchParams(window.location.search);
 const campaignId = params.get("id");
+if (!campaignId) alert("Campanha não encontrada");
 
-if (!campaignId) {
-  alert("Campanha não encontrada. Use o link correto.");
-  throw new Error("Sem ID de campanha");
-}
-
-let userUID = null;
+let userUID;
 let shots = 0;
 let tensao = 0;
+let dadosTotais = 6;
 
-/* 🔐 AUTH */
+/* AUTH */
 auth.onAuthStateChanged(user => {
   if (user) {
     userUID = user.uid;
     loginBox.classList.add("hidden");
     fichaBox.classList.remove("hidden");
     carregarFicha();
-  } else {
-    loginBox.classList.remove("hidden");
-    fichaBox.classList.add("hidden");
   }
 });
 
+/* LOGIN */
 function login() {
   auth.signInWithEmailAndPassword(email.value, senha.value)
     .catch(e => loginErro.innerText = e.message);
@@ -129,7 +166,55 @@ function logout() {
   auth.signOut();
 }
 
-/* 📄 SALVAR FICHA NA CAMPANHA */
+/* SHOTS */
+function addShot() {
+  shots++;
+  if (shots >= 3) shots = 0;
+  atualizarUI();
+}
+
+function ganharDado() {
+  dadosTotais++;
+  atualizarUI();
+}
+
+/* 🎲 TESTE */
+function rolarTeste() {
+  let qtd = Math.min(parseInt(qtdDados.value), dadosTotais);
+  let falhas = 0;
+  let resultados = [];
+
+  for (let i = 0; i < qtd; i++) {
+    let d = Math.floor(Math.random() * 6) + 1;
+    resultados.push(d);
+    animarDado(d);
+    if (d <= 2) falhas++;
+  }
+
+  tensao = Math.min(10, tensao + falhas);
+  dadosTotais = Math.max(0, dadosTotais - falhas);
+
+  resultadoDados.innerText =
+    `Resultados: ${resultados.join(", ")} | Falhas: ${falhas}`;
+
+  atualizarUI();
+}
+
+/* 🎲 ANIMAÇÃO */
+function animarDado(valor) {
+  const cube = document.getElementById("cube");
+  const rot = {
+    1:"rotateX(0deg) rotateY(0deg)",
+    2:"rotateY(-90deg)",
+    3:"rotateY(180deg)",
+    4:"rotateY(90deg)",
+    5:"rotateX(-90deg)",
+    6:"rotateX(90deg)"
+  };
+  cube.style.transform = rot[valor];
+}
+
+/* SALVAR */
 function salvarFicha() {
   db.collection("campaigns")
     .doc(campaignId)
@@ -140,62 +225,36 @@ function salvarFicha() {
       historia: historia.value,
       shots,
       tensao,
-      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      dadosTotais
     });
-
-  alert("Ficha salva na campanha!");
+  alert("Ficha salva!");
 }
 
-/* 📥 CARREGAR FICHA DA CAMPANHA */
 function carregarFicha() {
   db.collection("campaigns")
     .doc(campaignId)
     .collection("players")
     .doc(userUID)
-    .get()
-    .then(doc => {
+    .get().then(doc => {
       if (doc.exists) {
         const d = doc.data();
         nome.value = d.nome || "";
         historia.value = d.historia || "";
         shots = d.shots || 0;
         tensao = d.tensao || 0;
+        dadosTotais = d.dadosTotais ?? 6;
         atualizarUI();
       }
     });
 }
 
-/* 🎯 SHOTS */
-function addShot() {
-  shots++;
-  if (shots >= 3) shots = 0;
-  atualizarUI();
-}
-
-/* 🎲 DADOS */
-function rolarDados() {
-  let qtd = parseInt(qtdDados.value);
-  let falhas = 0;
-  let res = [];
-
-  for (let i = 0; i < qtd; i++) {
-    let d = Math.floor(Math.random() * 6) + 1;
-    res.push(d);
-    if (d <= 2) falhas++;
-  }
-
-  tensao += falhas;
-  if (tensao > 10) tensao = 10;
-
-  resultadoDados.innerText = "Resultados: " + res.join(", ");
-  atualizarUI();
-}
-
 function atualizarUI() {
-  shots.innerText = shots + " / 3";
-  tensao.innerText = tensao + " / 10";
+  document.getElementById("shots").innerText = shots + " / 3";
+  document.getElementById("tensao").innerText = tensao + " / 10";
+  document.getElementById("dadosTotais").innerText = dadosTotais;
 }
 </script>
 
 </body>
 </html>
+
